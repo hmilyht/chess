@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>手机象棋</title>
+    <style>
+        body { margin: 0; background: #eee; display: flex; flex-direction: column; align-items: center; font-family: sans-serif; }
+        h2 { margin: 10px 0; font-size: 18px; }
+        #status { color: red; font-weight: bold; margin-bottom: 5px; }
+        .board { position: relative; width: 320px; height: 360px; background: #E6CFA0; border: 2px solid #555; }
+        .river { position: absolute; top: 158px; width: 100%; text-align: center; color: #888; font-size: 20px; }
+        .grid-h { position: absolute; height: 1px; background: #888; width: 100%; }
+        .grid-v { position: absolute; width: 1px; background: #888; height: 100%; }
+        .piece { position: absolute; width: 32px; height: 32px; border-radius: 50%; background: #fdf5e6; border: 1px solid #333; display: flex; justify-content: center; align-items: center; font-weight: bold; cursor: pointer; box-shadow: 1px 1px 2px rgba(0,0,0,0.3); font-size: 18px; z-index: 10; margin-left: -16px; margin-top: -16px; transition: transform 0.1s; }
+        .red { color: #d00; border-color: #d00; }
+        .black { color: #000; border-color: #000; }
+        .selected { background: #81d4fa; transform: scale(1.2); box-shadow: 0 0 8px blue; z-index: 20; }
+        .dot { position: absolute; width: 10px; height: 10px; background: rgba(0,255,0,0.6); border-radius: 50%; margin-left: -5px; margin-top: -5px; z-index: 5; pointer-events: none; }
+        button { margin-top: 15px; padding: 8px 20px; font-size: 16px; background: #333; color: white; border: none; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h2>简易中国象棋</h2>
+    <div id="status">红方走棋</div>
+    <div class="board" id="board" onclick="onBoardClick(event)">
+        <div class="river" style="top:170px;">楚河&nbsp;&nbsp;&nbsp;&nbsp;汉界</div>
+    </div>
+    <button onclick="init()">重置游戏</button>
+
+<script>
+const CW=35.5, CH=36, OFF_X=18, OFF_Y=18; 
+let pieces={}, turn='red', sel=null;
+const board = document.getElementById('board');
+
+// 画线
+for(let i=0;i<10;i++){ let l=document.createElement('div'); l.className='grid-h'; l.style.top=(OFF_Y+i*CH)+'px'; board.appendChild(l); }
+for(let i=0;i<9;i++){ let l=document.createElement('div'); l.className='grid-v'; l.style.left=(OFF_X+i*CW)+'px'; l.style.height=(i==0||i==8)?'324px':'144px'; board.appendChild(l); 
+if(i>0&&i<8){ let l2=l.cloneNode(); l2.style.top='180px'; board.appendChild(l2); } }
+
+function init(){
+    pieces={}; turn='red'; sel=null; update();
+    document.querySelectorAll('.piece, .dot').forEach(e=>e.remove());
+    const seeds=[
+        ['c_ju','车',0,0],['c_ma','马',1,0],['c_xiang','象',2,0],['c_shi','士',3,0],['c_jiang','将',4,0],['c_shi','士',5,0],['c_xiang','象',6,0],['c_ma','马',7,0],['c_ju','车',8,0],
+        ['c_pao','炮',1,2],['c_pao','炮',7,2],['c_zu','卒',0,3],['c_zu','卒',2,3],['c_zu','卒',4,3],['c_zu','卒',6,3],['c_zu','卒',8,3],
+        ['h_ju','车',0,9],['h_ma','马',1,9],['h_xiang','相',2,9],['h_shi','仕',3,9],['h_shuai','帅',4,9],['h_shi','仕',5,9],['h_xiang','相',6,9],['h_ma','马',7,9],['h_ju','车',8,9],
+        ['h_pao','炮',1,7],['h_pao','炮',7,7],['h_bing','兵',0,6],['h_bing','兵',2,6],['h_bing','兵',4,6],['h_bing','兵',6,6],['h_bing','兵',8,6]
+    ];
+    seeds.forEach(p=>addPiece(p[2],p[3],p[1],p[0].startsWith('c')?'black':'red'));
+}
+function addPiece(x,y,n,c){
+    let d=document.createElement('div'); d.className=`piece ${c}`; d.innerHTML=n;
+    pos(d,x,y); d.onclick=(e)=>{e.stopPropagation(); clickP(x,y,c)};
+    board.appendChild(d); pieces[`${x},${y}`]={name:n,color:c,el:d};
+}
+function pos(el,x,y){ el.style.left=(OFF_X+x*CW)+'px'; el.style.top=(OFF_Y+y*CH)+'px'; }
+function update(){ document.getElementById('status').innerHTML = turn=='red'?'红方走棋':'黑方走棋'; document.getElementById('status').style.color=turn=='red'?'#d00':'#000'; }
+
+function clickP(x,y,c){
+    if(sel && pieces[`${sel[0]},${sel[1]}`].color!==c){ tryMove(x,y); return; } // 吃子
+    if(c===turn){ // 选中
+        if(sel) pieces[`${sel[0]},${sel[1]}`].el.classList.remove('selected');
+        sel=[x,y]; pieces[`${x},${y}`].el.classList.add('selected');
+        showMoves(x,y);
+    }
+}
+function onBoardClick(e){
+    if(!sel)return;
+    let rect = board.getBoundingClientRect();
+    let x = Math.round((e.clientX - rect.left - OFF_X)/CW);
+    let y = Math.round((e.clientY - rect.top - OFF_Y)/CH);
+    if(x>=0&&x<=8&&y>=0&&y<=9) tryMove(x,y);
+}
+function tryMove(ex,ey){
+    let [sx,sy]=sel; 
+    if(canMove(sx,sy,ex,ey)){
+        if(pieces[`${ex},${ey}`]){ 
+            if('将帅'.includes(pieces[`${ex},${ey}`].name)) alert(turn=='red'?'红方胜':'黑方胜');
+            pieces[`${ex},${ey}`].el.remove(); delete pieces[`${ex},${ey}`]; 
+        }
+        let p=pieces[`${sx},${sy}`]; delete pieces[`${sx},${sy}`]; pieces[`${ex},${ey}`]=p;
+        pos(p.el,ex,ey); p.el.classList.remove('selected');
+        sel=null; document.querySelectorAll('.dot').forEach(e=>e.remove());
+        turn=turn=='red'?'black':'red'; update();
+    }
+}
+function showMoves(sx,sy){
+    document.querySelectorAll('.dot').forEach(e=>e.remove());
+    for(let x=0;x<9;x++) for(let y=0;y<10;y++){
+        if(canMove(sx,sy,x,y) && (!pieces[`${x},${y}`] || pieces[`${x},${y}`].color!==turn)){
+            let d=document.createElement('div'); d.className='dot'; pos(d,x,y); board.appendChild(d);
+        }
+    }
+}
+function count(sx,sy,ex,ey){
+    let c=0;
+    if(sx==ex) for(let y=Math.min(sy,ey)+1;y<Math.max(sy,ey);y++) if(pieces[`${sx},${y}`]) c++;
+    else for(let x=Math.min(sx,ex)+1;x<Math.max(sx,ex);x++) if(pieces[`${x},${sy}`]) c++;
+    return c;
+}
+function canMove(sx,sy,ex,ey){
+    let p=pieces[`${sx},${sy}`], dx=ex-sx, dy=ey-sy, a_dx=Math.abs(dx), a_dy=Math.abs(dy);
+    if(pieces[`${ex},${ey}`] && pieces[`${ex},${ey}`].color==p.color) return false;
+    if(p.name=='车') return (sx==ex||sy==ey) && count(sx,sy,ex,ey)==0;
+    if(p.name=='炮') { let c=count(sx,sy,ex,ey); return (sx==ex||sy==ey) && (pieces[`${ex},${ey}`]?c==1:c==0); }
+    if(p.name=='马') return (a_dx==2&&a_dy==1&&!pieces[`${sx+dx/2},${sy}`]) || (a_dx==1&&a_dy==2&&!pieces[`${sx},${sy+dy/2}`]);
+    if(p.name=='象'||p.name=='相') return a_dx==2&&a_dy==2&&!pieces[`${sx+dx/2},${sy+dy/2}`]&&((p.color=='red')?ey>4:ey<5);
+    if(p.name=='士'||p.name=='仕') return a_dx==1&&a_dy==1&&ex>=3&&ex<=5&&((p.color=='red')?ey>6:ey<3);
+    if(p.name=='将'||p.name=='帅') return a_dx+a_dy==1&&ex>=3&&ex<=5&&((p.color=='red')?ey>6:ey<3);
+    if(p.name=='兵'||p.name=='卒') { let f=p.color=='red'?-1:1; if(dy==f&&dx==0)return true; if((p.color=='red'?sy<=4:sy>=5)&&dy==0&&a_dx==1)return true; return false;}
+    return false;
+}
+init();
+</script>
+</body>
+</html>
