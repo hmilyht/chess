@@ -1,117 +1,357 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>手机象棋</title>
+    <title>完美修复版象棋</title>
     <style>
-        body { margin: 0; background: #eee; display: flex; flex-direction: column; align-items: center; font-family: sans-serif; }
-        h2 { margin: 10px 0; font-size: 18px; }
-        #status { color: red; font-weight: bold; margin-bottom: 5px; }
-        .board { position: relative; width: 320px; height: 360px; background: #E6CFA0; border: 2px solid #555; }
-        .river { position: absolute; top: 158px; width: 100%; text-align: center; color: #888; font-size: 20px; }
-        .grid-h { position: absolute; height: 1px; background: #888; width: 100%; }
-        .grid-v { position: absolute; width: 1px; background: #888; height: 100%; }
-        .piece { position: absolute; width: 32px; height: 32px; border-radius: 50%; background: #fdf5e6; border: 1px solid #333; display: flex; justify-content: center; align-items: center; font-weight: bold; cursor: pointer; box-shadow: 1px 1px 2px rgba(0,0,0,0.3); font-size: 18px; z-index: 10; margin-left: -16px; margin-top: -16px; transition: transform 0.1s; }
-        .red { color: #d00; border-color: #d00; }
-        .black { color: #000; border-color: #000; }
-        .selected { background: #81d4fa; transform: scale(1.2); box-shadow: 0 0 8px blue; z-index: 20; }
-        .dot { position: absolute; width: 10px; height: 10px; background: rgba(0,255,0,0.6); border-radius: 50%; margin-left: -5px; margin-top: -5px; z-index: 5; pointer-events: none; }
-        button { margin-top: 15px; padding: 8px 20px; font-size: 16px; background: #333; color: white; border: none; border-radius: 4px; }
+        body { margin: 0; background: #f0f0f0; display: flex; flex-direction: column; align-items: center; font-family: sans-serif; touch-action: none; /* 禁止浏览器缩放 */ }
+        h3 { margin: 15px 0 10px; color: #333; }
+        
+        /* 状态栏 */
+        .status-bar { display: flex; justify-content: space-between; width: 320px; margin-bottom: 10px; font-weight: bold; }
+        .turn-indicator { padding: 5px 15px; border-radius: 5px; background: #ddd; }
+        .active-red { background: #ffcccc; color: #d00; border: 2px solid #d00; }
+        .active-black { background: #ccc; color: #000; border: 2px solid #000; }
+
+        /* 棋盘 */
+        .board { position: relative; width: 320px; height: 360px; background: #E6CFA0; border: 3px solid #5d4037; box-shadow: 0 5px 15px rgba(0,0,0,0.3); cursor: pointer; }
+        
+        /* 棋盘线和装饰 */
+        .grid-h { position: absolute; height: 1px; background: #8d6e63; width: 100%; left: 0; }
+        .grid-v { position: absolute; width: 1px; background: #8d6e63; height: 100%; top: 0; }
+        .river { position: absolute; top: 158px; width: 100%; text-align: center; color: #8d6e63; font-size: 20px; line-height: 40px; pointer-events: none; }
+        
+        /* 棋子 - 关键：pointer-events: none 让点击穿透棋子直接点到棋盘，防止坐标错乱 */
+        .piece { 
+            position: absolute; width: 32px; height: 32px; 
+            border-radius: 50%; background: #fdf5e6; 
+            border: 2px solid #333; 
+            display: flex; justify-content: center; align-items: center; 
+            font-weight: bold; font-size: 18px; 
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            z-index: 10; 
+            pointer-events: none; /* 核心修复：点击穿透 */
+            transition: left 0.2s, top 0.2s, transform 0.1s;
+        }
+        .p-red { color: #c00; border-color: #c00; }
+        .p-black { color: #111; border-color: #111; }
+        
+        /* 选中和提示 */
+        .selection { position: absolute; width: 34px; height: 34px; border: 2px solid blue; border-radius: 5px; box-shadow: 0 0 10px blue; z-index: 5; pointer-events: none; display: none; }
+        .dot { position: absolute; width: 10px; height: 10px; background: rgba(0,200,0,0.7); border-radius: 50%; z-index: 8; pointer-events: none; transform: translate(-50%, -50%); }
+
+        /* 按钮 */
+        button { margin-top: 20px; padding: 10px 30px; font-size: 16px; background: #5d4037; color: white; border: none; border-radius: 25px; box-shadow: 0 4px #3e2723; }
+        button:active { transform: translateY(2px); box-shadow: 0 2px #3e2723; }
     </style>
 </head>
 <body>
-    <h2>简易中国象棋</h2>
-    <div id="status">红方走棋</div>
-    <div class="board" id="board" onclick="onBoardClick(event)">
-        <div class="river" style="top:170px;">楚河&nbsp;&nbsp;&nbsp;&nbsp;汉界</div>
+
+    <h3>手机中国象棋 (修复版)</h3>
+    
+    <div class="status-bar">
+        <div id="statusText" class="turn-indicator active-red">红方回合</div>
     </div>
-    <button onclick="init()">重置游戏</button>
+
+    <div class="board" id="board">
+        <div class="river" style="top:144px;">楚河&nbsp;&nbsp;&nbsp;&nbsp;汉界</div>
+        <div id="selection" class="selection"></div>
+        <div id="dotsContainer"></div>
+        </div>
+
+    <button onclick="initGame()">重新开始</button>
 
 <script>
-const CW=35.5, CH=36, OFF_X=18, OFF_Y=18; 
-let pieces={}, turn='red', sel=null;
+// --- 配置参数 ---
+const CW = 35.5; // 格子宽
+const CH = 36;   // 格子高
+const OFF_X = 18; // 棋盘左边距
+const OFF_Y = 18; // 棋盘上边距
+
+// --- 游戏状态 ---
+let pieces = {}; // 数据中心：{"x,y": {name, color, el}}
+let turn = 'red';
+let selectedPos = null;
+
 const board = document.getElementById('board');
+const selBox = document.getElementById('selection');
+const statusText = document.getElementById('statusText');
 
-// 画线
-for(let i=0;i<10;i++){ let l=document.createElement('div'); l.className='grid-h'; l.style.top=(OFF_Y+i*CH)+'px'; board.appendChild(l); }
-for(let i=0;i<9;i++){ let l=document.createElement('div'); l.className='grid-v'; l.style.left=(OFF_X+i*CW)+'px'; l.style.height=(i==0||i==8)?'324px':'144px'; board.appendChild(l); 
-if(i>0&&i<8){ let l2=l.cloneNode(); l2.style.top='180px'; board.appendChild(l2); } }
+// --- 初始化绘制棋盘线 (仅视觉) ---
+function drawGrid() {
+    // 横线 (10条)
+    for(let i=0; i<10; i++){
+        let l = document.createElement('div');
+        l.className = 'grid-h';
+        l.style.top = (OFF_Y + i*CH) + 'px';
+        board.appendChild(l);
+    }
+    // 竖线 (9条)
+    for(let i=0; i<9; i++){
+        let l = document.createElement('div');
+        l.className = 'grid-v';
+        l.style.left = (OFF_X + i*CW) + 'px';
+        l.style.height = (i==0 || i==8) ? '324px' : '144px'; // 楚河断开
+        board.appendChild(l);
+        if(i>0 && i<8) { // 下半部分竖线
+            let l2 = l.cloneNode();
+            l2.style.top = '180px';
+            board.appendChild(l2);
+        }
+    }
+    // 九宫格斜线 (简化绘制)
+    // 略，为保证代码简短，暂不画斜线，不影响走棋
+}
 
-function init(){
-    pieces={}; turn='red'; sel=null; update();
-    document.querySelectorAll('.piece, .dot').forEach(e=>e.remove());
-    const seeds=[
+drawGrid();
+initGame();
+
+// --- 核心逻辑 ---
+
+function initGame() {
+    // 清理旧棋子
+    document.querySelectorAll('.piece').forEach(e => e.remove());
+    document.getElementById('dotsContainer').innerHTML = '';
+    selBox.style.display = 'none';
+    
+    pieces = {};
+    turn = 'red';
+    selectedPos = null;
+    updateStatus();
+
+    // 定义开局
+    const setup = [
         ['c_ju','车',0,0],['c_ma','马',1,0],['c_xiang','象',2,0],['c_shi','士',3,0],['c_jiang','将',4,0],['c_shi','士',5,0],['c_xiang','象',6,0],['c_ma','马',7,0],['c_ju','车',8,0],
-        ['c_pao','炮',1,2],['c_pao','炮',7,2],['c_zu','卒',0,3],['c_zu','卒',2,3],['c_zu','卒',4,3],['c_zu','卒',6,3],['c_zu','卒',8,3],
+        ['c_pao','炮',1,2],['c_pao','炮',7,2],
+        ['c_zu','卒',0,3],['c_zu','卒',2,3],['c_zu','卒',4,3],['c_zu','卒',6,3],['c_zu','卒',8,3],
+        
         ['h_ju','车',0,9],['h_ma','马',1,9],['h_xiang','相',2,9],['h_shi','仕',3,9],['h_shuai','帅',4,9],['h_shi','仕',5,9],['h_xiang','相',6,9],['h_ma','马',7,9],['h_ju','车',8,9],
-        ['h_pao','炮',1,7],['h_pao','炮',7,7],['h_bing','兵',0,6],['h_bing','兵',2,6],['h_bing','兵',4,6],['h_bing','兵',6,6],['h_bing','兵',8,6]
+        ['h_pao','炮',1,7],['h_pao','炮',7,7],
+        ['h_bing','兵',0,6],['h_bing','兵',2,6],['h_bing','兵',4,6],['h_bing','兵',6,6],['h_bing','兵',8,6]
     ];
-    seeds.forEach(p=>addPiece(p[2],p[3],p[1],p[0].startsWith('c')?'black':'red'));
-}
-function addPiece(x,y,n,c){
-    let d=document.createElement('div'); d.className=`piece ${c}`; d.innerHTML=n;
-    pos(d,x,y); d.onclick=(e)=>{e.stopPropagation(); clickP(x,y,c)};
-    board.appendChild(d); pieces[`${x},${y}`]={name:n,color:c,el:d};
-}
-function pos(el,x,y){ el.style.left=(OFF_X+x*CW)+'px'; el.style.top=(OFF_Y+y*CH)+'px'; }
-function update(){ document.getElementById('status').innerHTML = turn=='red'?'红方走棋':'黑方走棋'; document.getElementById('status').style.color=turn=='red'?'#d00':'#000'; }
 
-function clickP(x,y,c){
-    if(sel && pieces[`${sel[0]},${sel[1]}`].color!==c){ tryMove(x,y); return; } // 吃子
-    if(c===turn){ // 选中
-        if(sel) pieces[`${sel[0]},${sel[1]}`].el.classList.remove('selected');
-        sel=[x,y]; pieces[`${x},${y}`].el.classList.add('selected');
-        showMoves(x,y);
-    }
+    setup.forEach(p => createPiece(p[2], p[3], p[1], p[0].startsWith('c') ? 'black' : 'red'));
 }
-function onBoardClick(e){
-    if(!sel)return;
+
+function createPiece(x, y, name, color) {
+    let el = document.createElement('div');
+    el.className = `piece ${color === 'red' ? 'p-red' : 'p-black'}`;
+    el.innerText = name;
+    // 设置初始位置
+    updatePiecePos(el, x, y);
+    board.appendChild(el);
+    
+    // 存入数据 pieces
+    pieces[`${x},${y}`] = { name: name, color: color, el: el };
+}
+
+function updatePiecePos(el, x, y) {
+    // 居中计算：格点坐标 - 棋子半径
+    el.style.left = (OFF_X + x * CW - 16) + 'px';
+    el.style.top = (OFF_Y + y * CH - 16) + 'px';
+}
+
+// --- 交互处理 (修复版核心) ---
+
+// 绑定在 Board 上，而不是棋子上
+board.onclick = function(e) {
+    // 1. 获取点击相对于棋盘的位置
     let rect = board.getBoundingClientRect();
-    let x = Math.round((e.clientX - rect.left - OFF_X)/CW);
-    let y = Math.round((e.clientY - rect.top - OFF_Y)/CH);
-    if(x>=0&&x<=8&&y>=0&&y<=9) tryMove(x,y);
-}
-function tryMove(ex,ey){
-    let [sx,sy]=sel; 
-    if(canMove(sx,sy,ex,ey)){
-        if(pieces[`${ex},${ey}`]){ 
-            if('将帅'.includes(pieces[`${ex},${ey}`].name)) alert(turn=='red'?'红方胜':'黑方胜');
-            pieces[`${ex},${ey}`].el.remove(); delete pieces[`${ex},${ey}`]; 
+    let clickX = e.clientX - rect.left;
+    let clickY = e.clientY - rect.top;
+
+    // 2. 转换为网格坐标 (四舍五入到最近的交叉点)
+    let x = Math.round((clickX - OFF_X) / CW);
+    let y = Math.round((clickY - OFF_Y) / CH);
+
+    // 3. 越界检查
+    if (x < 0 || x > 8 || y < 0 || y > 9) return;
+
+    handleAction(x, y);
+};
+
+function handleAction(x, y) {
+    let key = `${x},${y}`;
+    let target = pieces[key];
+
+    // 情况A：如果你已经选中了一个棋子
+    if (selectedPos) {
+        let [sx, sy] = selectedPos;
+        // 如果点击的是自己 (取消选中)
+        if (sx === x && sy === y) {
+            deselect();
+            return;
         }
-        let p=pieces[`${sx},${sy}`]; delete pieces[`${sx},${sy}`]; pieces[`${ex},${ey}`]=p;
-        pos(p.el,ex,ey); p.el.classList.remove('selected');
-        sel=null; document.querySelectorAll('.dot').forEach(e=>e.remove());
-        turn=turn=='red'?'black':'red'; update();
+        // 如果点击的是己方其他棋子 (切换选中)
+        if (target && target.color === turn) {
+            select(x, y);
+            return;
+        }
+        // 否则：尝试移动或吃子
+        tryMove(sx, sy, x, y);
+    } 
+    // 情况B：还没有选中，且点击了己方棋子
+    else {
+        if (target && target.color === turn) {
+            select(x, y);
+        }
     }
 }
-function showMoves(sx,sy){
-    document.querySelectorAll('.dot').forEach(e=>e.remove());
-    for(let x=0;x<9;x++) for(let y=0;y<10;y++){
-        if(canMove(sx,sy,x,y) && (!pieces[`${x},${y}`] || pieces[`${x},${y}`].color!==turn)){
-            let d=document.createElement('div'); d.className='dot'; pos(d,x,y); board.appendChild(d);
+
+function select(x, y) {
+    selectedPos = [x, y];
+    // 移动选中框
+    selBox.style.display = 'block';
+    selBox.style.left = (OFF_X + x * CW - 19) + 'px'; // 微调边框位置
+    selBox.style.top = (OFF_Y + y * CH - 19) + 'px';
+    
+    showValidMoves(x, y);
+}
+
+function deselect() {
+    selectedPos = null;
+    selBox.style.display = 'none';
+    document.getElementById('dotsContainer').innerHTML = '';
+}
+
+function tryMove(sx, sy, ex, ey) {
+    if (canMove(sx, sy, ex, ey)) {
+        // 1. 检查是否吃子
+        let targetKey = `${ex},${ey}`;
+        if (pieces[targetKey]) {
+            let deadName = pieces[targetKey].name;
+            if (deadName === '将' || deadName === '帅') {
+                alert(turn === 'red' ? "红方胜利！" : "黑方胜利！");
+                initGame();
+                return;
+            }
+            // 移除被吃棋子的 DOM
+            pieces[targetKey].el.remove();
+        }
+
+        // 2. 移动数据
+        let p = pieces[`${sx},${sy}`];
+        delete pieces[`${sx},${sy}`]; // 删除旧位置
+        pieces[targetKey] = p;       // 存入新位置
+
+        // 3. 移动视觉 DOM
+        updatePiecePos(p.el, ex, ey);
+
+        // 4. 结束回合
+        deselect();
+        turn = (turn === 'red' ? 'black' : 'red');
+        updateStatus();
+    } else {
+        // 移动不合法，不做任何事，或者给个震动反馈
+        console.log("Invalid move");
+    }
+}
+
+function updateStatus() {
+    if(turn === 'red') {
+        statusText.innerText = "红方走棋";
+        statusText.className = "turn-indicator active-red";
+    } else {
+        statusText.innerText = "黑方走棋";
+        statusText.className = "turn-indicator active-black";
+    }
+}
+
+// --- 规则引擎 (保持精简) ---
+function showValidMoves(sx, sy) {
+    let con = document.getElementById('dotsContainer');
+    con.innerHTML = '';
+    for(let x=0; x<9; x++) {
+        for(let y=0; y<10; y++) {
+            // 排除己方棋子
+            if(pieces[`${x},${y}`] && pieces[`${x},${y}`].color === turn) continue;
+            
+            if(canMove(sx, sy, x, y)) {
+                let d = document.createElement('div');
+                d.className = 'dot';
+                d.style.left = (OFF_X + x*CW) + 'px';
+                d.style.top = (OFF_Y + y*CH) + 'px';
+                con.appendChild(d);
+            }
         }
     }
 }
-function count(sx,sy,ex,ey){
-    let c=0;
-    if(sx==ex) for(let y=Math.min(sy,ey)+1;y<Math.max(sy,ey);y++) if(pieces[`${sx},${y}`]) c++;
-    else for(let x=Math.min(sx,ex)+1;x<Math.max(sx,ex);x++) if(pieces[`${x},${sy}`]) c++;
-    return c;
+
+function countPieces(sx, sy, ex, ey) {
+    let cnt = 0;
+    if (sx === ex) { // 竖线
+        let min = Math.min(sy, ey) + 1;
+        let max = Math.max(sy, ey);
+        for(let y=min; y<max; y++) if(pieces[`${sx},${y}`]) cnt++;
+    } else { // 横线
+        let min = Math.min(sx, ex) + 1;
+        let max = Math.max(sx, ex);
+        for(let x=min; x<max; x++) if(pieces[`${x},${sy}`]) cnt++;
+    }
+    return cnt;
 }
-function canMove(sx,sy,ex,ey){
-    let p=pieces[`${sx},${sy}`], dx=ex-sx, dy=ey-sy, a_dx=Math.abs(dx), a_dy=Math.abs(dy);
-    if(pieces[`${ex},${ey}`] && pieces[`${ex},${ey}`].color==p.color) return false;
-    if(p.name=='车') return (sx==ex||sy==ey) && count(sx,sy,ex,ey)==0;
-    if(p.name=='炮') { let c=count(sx,sy,ex,ey); return (sx==ex||sy==ey) && (pieces[`${ex},${ey}`]?c==1:c==0); }
-    if(p.name=='马') return (a_dx==2&&a_dy==1&&!pieces[`${sx+dx/2},${sy}`]) || (a_dx==1&&a_dy==2&&!pieces[`${sx},${sy+dy/2}`]);
-    if(p.name=='象'||p.name=='相') return a_dx==2&&a_dy==2&&!pieces[`${sx+dx/2},${sy+dy/2}`]&&((p.color=='red')?ey>4:ey<5);
-    if(p.name=='士'||p.name=='仕') return a_dx==1&&a_dy==1&&ex>=3&&ex<=5&&((p.color=='red')?ey>6:ey<3);
-    if(p.name=='将'||p.name=='帅') return a_dx+a_dy==1&&ex>=3&&ex<=5&&((p.color=='red')?ey>6:ey<3);
-    if(p.name=='兵'||p.name=='卒') { let f=p.color=='red'?-1:1; if(dy==f&&dx==0)return true; if((p.color=='red'?sy<=4:sy>=5)&&dy==0&&a_dx==1)return true; return false;}
+
+function canMove(sx, sy, ex, ey) {
+    let p = pieces[`${sx},${sy}`];
+    let dx = ex - sx, dy = ey - sy;
+    let adx = Math.abs(dx), ady = Math.abs(dy);
+    let name = p.name;
+    
+    // 目标如果有己方棋子，前置检查已排除，但这里双重保险
+    if(pieces[`${ex},${ey}`] && pieces[`${ex},${ey}`].color === p.color) return false;
+
+    if (name === '车') return (sx===ex || sy===ey) && countPieces(sx,sy,ex,ey) === 0;
+    
+    if (name === '炮') {
+        let cnt = countPieces(sx,sy,ex,ey);
+        let hasTarget = pieces[`${ex},${ey}`];
+        if (sx!==ex && sy!==ey) return false;
+        return hasTarget ? (cnt === 1) : (cnt === 0);
+    }
+    
+    if (name === '马') {
+        if (adx===2 && ady===1) return !pieces[`${sx + dx/2},${sy}`];
+        if (adx===1 && ady===2) return !pieces[`${sx},${sy + dy/2}`];
+        return false;
+    }
+    
+    if (name === '相' || name === '象') {
+        if (adx!==2 || ady!==2) return false;
+        if (pieces[`${sx + dx/2},${sy + dy/2}`]) return false; // 塞象眼
+        if (p.color === 'red' && ey < 5) return false; // 不过河
+        if (p.color === 'black' && ey > 4) return false;
+        return true;
+    }
+    
+    if (name === '士' || name === '仕') {
+        if (adx!==1 || ady!==1) return false;
+        if (ex < 3 || ex > 5) return false;
+        if (p.color === 'red' && ey < 7) return false;
+        if (p.color === 'black' && ey > 2) return false;
+        return true;
+    }
+    
+    if (name === '帅' || name === '将') {
+        if (adx + ady !== 1) return false;
+        if (ex < 3 || ex > 5) return false;
+        if (p.color === 'red' && ey < 7) return false;
+        if (p.color === 'black' && ey > 2) return false;
+        return true;
+    }
+    
+    if (name === '兵' || name === '卒') {
+        let forward = p.color === 'red' ? -1 : 1;
+        // 过河判断
+        let crossed = p.color === 'red' ? (sy <= 4) : (sy >= 5);
+        
+        if (dy === forward && dx === 0) return true; // 前进
+        if (crossed && dy === 0 && adx === 1) return true; // 过河横走
+        return false;
+    }
+    
     return false;
 }
-init();
 </script>
 </body>
 </html>
